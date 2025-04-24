@@ -12,6 +12,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 find_package(PkgConfig REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(ALSA REQUIRED)
+pkg_check_modules(QTCORE REQUIRED Qt5Core)
+pkg_check_modules(QTGUI REQUIRED Qt5Gui)
+pkg_check_modules(QTWIDGETS REQUIRED Qt5Widgets)
 
 # Find GLib using pkg-config
 pkg_check_modules(GLIB REQUIRED glib-2.0)
@@ -38,7 +43,7 @@ link_directories(${CMAKE_SOURCE_DIR}/lib/zoom_meeting_sdk/qt_libs)
 link_directories(${CMAKE_SOURCE_DIR}/lib/zoom_meeting_sdk/qt_libs/Qt/lib)
 
 
-add_executable(meetingSDKDemo 
+add_executable(meetingSDKDemo
               ${CMAKE_SOURCE_DIR}/meeting_sdk_demo.cpp
               ${CMAKE_SOURCE_DIR}/MeetingReminderEventListener.h
               ${CMAKE_SOURCE_DIR}/MeetingReminderEventListener.cpp
@@ -63,14 +68,22 @@ add_executable(meetingSDKDemo
               )
 
 # Link GLib libraries
-target_link_libraries(meetingSDKDemo ${GLIB_LIBRARIES} ${GIO_LIBRARIES})
-
-target_link_libraries(meetingSDKDemo gcc_s gcc)
-target_link_libraries(meetingSDKDemo meetingsdk)
-target_link_libraries(meetingSDKDemo glib-2.0)
-target_link_libraries(meetingSDKDemo curl)
-target_link_libraries(meetingSDKDemo pthread)
-
+target_link_libraries(meetingSDKDemo
+    ${GLIB_LIBRARIES}
+    ${GIO_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+    ${ALSA_LIBRARIES}
+    ${QTCORE_LIBRARIES}
+    ${QTGUI_LIBRARIES}
+    ${QTWIDGETS_LIBRARIES}
+    gcc_s
+    gcc
+    meetingsdk
+    glib-2.0
+    curl
+    pthread
+    GL
+)
 
 # Create a symbolic link
 execute_process(COMMAND ln -s libmeetingsdk.so libmeetingsdk.so.1
