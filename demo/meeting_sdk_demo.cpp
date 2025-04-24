@@ -21,8 +21,7 @@
 #include "meeting_service_components/meeting_participants_ctrl_interface.h"
 #include "meeting_service_components/meeting_video_interface.h"
 #include "setting_service_interface.h"
-
-
+#include "meeting_service_components/meeting_sharing_interface.h"
 
 //used to accept prompts
 #include "MeetingReminderEventListener.h"
@@ -64,6 +63,10 @@ std::string DEFAULT_AUDIO_SOURCE = "yourwavefile.wav";
 //references for SendVideoRawData
 std::string DEFAULT_VIDEO_SOURCE = "yourmp4file.mp4";
 
+//references for ShareVideo
+const std::string DEFAULT_SHARE_VIDEO = "sample.mp4"; // Change this to your video file path
+
+std::string share_video_path;
 
 GMainLoop* loop;
 
@@ -93,17 +96,14 @@ IZoomSDKAudioRawDataHelper* audioHelper;
 //userID is needed for video subscription.
 unsigned int userID;
 
-
-
-
-
 //this will enable or disable logic to get raw video and raw audio
 //do note that this will be overwritten by config.txt
 bool GetVideoRawData = true;
 bool GetAudioRawData = true;
 bool SendVideoRawData = false;
 bool SendAudioRawData = false;
-
+bool ShareScreen = false;
+IMeetingShareController* m_pShareController = nullptr;
 
 //this is a helper method to get the first User ID, it is just an arbitary UserID
 uint32_t getUserID() {
@@ -266,25 +266,77 @@ void turnOffSendVideoandAudio() {
 	}
 }
 
+// Add new function to start sharing
+void StartScreenShare() {
+    if (!m_pMeetingService) return;
+
+    m_pShareController = m_pMeetingService->GetMeetingShareController();
+    if (!m_pShareController) {
+        std::cout << "Failed to get share controller" << std::endl;
+        return;
+    }
+
+    // Start sharing the desktop screen
+    SDKError err = m_pShareController->StartAppShare(ShareType_Desktop);
+    if (err != SDKERR_SUCCESS) {
+        std::cout << "Failed to start screen sharing: " << err << std::endl;
+    } else {
+        std::cout << "Screen sharing started successfully" << std::endl;
+    }
+}
+
+// Add new function to start video sharing
+void StartVideoShare() {
+    if (!m_pMeetingService) return;
+
+    m_pShareController = m_pMeetingService->GetMeetingShareController();
+    if (!m_pShareController) {
+        std::cout << "Failed to get share controller" << std::endl;
+        return;
+    }
+
+    // 1. Create external share sources
+    ZoomSDKScreenShareSource* videoSource = new ZoomSDKScreenShareSource(share_video_path.c_str());
+    ZoomSDKScreenShareAudioSource* audioSource = new ZoomSDKScreenShareAudioSource(DEFAULT_AUDIO_SOURCE.c_str());
+
+    // 2. Get the share source helper and set the external sources
+    IZoomSDKShareSourceHelper* shareHelper = SDKInterfaceWrap::GetInst().GetRawdataShareSourceHelper();
+    if (!shareHelper) {
+        std::cout << "Failed to get share source helper" << std::endl;
+        return;
+    }
+
+    SDKError err = shareHelper->setExternalShareSource(videoSource, audioSource);
+    if (err != SDKERR_SUCCESS) {
+        std::cout << "Failed to set external share sources: " << err << std::endl;
+        return;
+    }
+
+    // 3. Start sharing
+    err = m_pShareController->ResumeCurrentSharing();
+    if (err != SDKERR_SUCCESS) {
+        std::cout << "Failed to start video sharing: " << err << std::endl;
+    } else {
+        std::cout << "Video sharing started successfully" << std::endl;
+    }
+}
 
 //callback when the SDK is inmeeting
 void onInMeeting() {
+    printf("onInMeeting Invoked\n");
 
-	printf("onInMeeting Invoked\n");
+    if (m_pMeetingService->GetMeetingStatus() == ZOOM_SDK_NAMESPACE::MEETING_STATUS_INMEETING) {
+        printf("In Meeting Now...\n");
 
-	//double check if you are in a meeting
-	if (m_pMeetingService->GetMeetingStatus() == ZOOM_SDK_NAMESPACE::MEETING_STATUS_INMEETING) {
-		printf("In Meeting Now...\n");
+        // Print participants
+        IList<unsigned int>* participants = m_pMeetingService->GetMeetingParticipantsController()->GetParticipantsList();
+        printf("Participants count: %d\n", participants->GetCount());
 
-		//print all list of participants
-		IList<unsigned int>* participants = m_pMeetingService->GetMeetingParticipantsController()->GetParticipantsList();
-		printf("Participants count: %d\n", participants->GetCount());
-	}
-
-	//first attempt to start raw recording  / sending, upon successfully joined and achieved "in-meeting" state.
-	CheckAndStartRawRecording(GetVideoRawData, GetAudioRawData);
-	CheckAndStartRawSending(SendVideoRawData, SendAudioRawData);
-
+        // Start video sharing if enabled
+        if (ShareScreen) {
+            StartVideoShare();
+        }
+    }
 }
 
 //on meeting ended, typically by host, do something here. it is possible to reuse this SDK instance
@@ -434,6 +486,22 @@ void ReadTEXTSettings()
 		std::cout << "SendAudioRawData: " << SendAudioRawData << std::endl;
 	}
 
+	if (config.find("ShareScreen") != config.end()) {
+		if (config["ShareScreen"] == "true") {
+			ShareScreen = true;
+		} else {
+			ShareScreen = false;
+		}
+		std::cout << "ShareScreen: " << ShareScreen << std::endl;
+	}
+
+	if (config.find("ShareVideoPath") != config.end()) {
+		share_video_path = config["ShareVideoPath"];
+		std::cout << "ShareVideoPath: " << share_video_path << std::endl;
+	} else {
+		share_video_path = DEFAULT_SHARE_VIDEO;
+	}
+
 	// Additional processing or handling of parsed values can be done here
 
 	printf("directory of config file: %s\n", self_dir.c_str());
@@ -466,6 +534,9 @@ void CleanSDK()
 	}
 	if (audioHelper) {
 		audioHelper->unSubscribe();
+	}
+	if (m_pShareController) {
+		m_pShareController->StopShare();
 	}
 	//if (_network_connection_helper)
 	//{
