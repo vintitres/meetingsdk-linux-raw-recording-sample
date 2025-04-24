@@ -69,7 +69,7 @@ GMainLoop* loop;
 
 
 //These are needed to readsettingsfromTEXT named config.txt
-std::string meeting_number, token, meeting_password, recording_token;
+std::string meeting_number, token, meeting_password, recording_token, username;
 
 
 //Services which are needed to initialize, authenticate and configure settings for the SDK
@@ -340,7 +340,7 @@ void processLine(const std::string& line, std::map<std::string, std::string>& co
 
 void ReadTEXTSettings()
 {
-	
+
 	std::string self_dir = getSelfDirPath();
 	printf("self path: %s\n", self_dir.c_str());
 	self_dir.append("/config.txt");
@@ -360,13 +360,17 @@ void ReadTEXTSettings()
 	while (std::getline(configFile, line)) {
 		// Process each line to extract key-value pairs
 		processLine(line, config);
-		
+
 		std::cerr << "Reading.." << line <<std::endl;
 	}
 
 	// Example: Accessing values by key
+	if (config.find("username") != config.end()) {
+		username = config["username"];
+		std::cout << "Username: " << username << std::endl;
+	}
 	if (config.find("meeting_number") != config.end()) {
-		
+
 		meeting_number=config["meeting_number"];
 		std::cout << "Meeting Number: " << config["meeting_number"] << std::endl;
 	}
@@ -375,18 +379,18 @@ void ReadTEXTSettings()
 		 	std::cout << "Token: " << token<< std::endl;
 	}
 	if (config.find("meeting_password") != config.end()) {
-		
+
 		meeting_password=config["meeting_password"];
 		std::cout << "meeting_password: " << meeting_password << std::endl;
 	}
 	if (config.find("recording_token") != config.end()) {
-	
+
 		 recording_token=config["recording_token"];
 		 	std::cout << "recording_token: " << recording_token << std::endl;
 	}
 	if (config.find("GetVideoRawData") != config.end()) {
 		std::cout << "GetVideoRawData before parsing is : " << config["GetVideoRawData"]   << std::endl;
-		
+
 	if (config["GetVideoRawData"] == "true"){
 			GetVideoRawData=true;
 		}
@@ -397,7 +401,7 @@ void ReadTEXTSettings()
 	}
 	if (config.find("GetAudioRawData") != config.end()) {
 		std::cout << "GetAudioRawData before parsing is : " << config["GetAudioRawData"]  << std::endl;
-		
+
 		if (config["GetAudioRawData"] == "true"){
 			GetAudioRawData=true;
 		}
@@ -531,7 +535,7 @@ void JoinMeeting()
 	std::cerr << "Joining Meeting" << std::endl;
 	SDKError err2(SDKError::SDKERR_SUCCESS);
 
-	//try to create the meetingservice object, 
+	//try to create the meetingservice object,
 	//this object will be used to join the meeting
 	if ((err2 = CreateMeetingService(&m_pMeetingService)) != SDKError::SDKERR_SUCCESS) {};
 	std::cerr << "MeetingService created." << std::endl;
@@ -544,7 +548,7 @@ void JoinMeeting()
 	// Set the event listener for meeting status
 	m_pMeetingService->SetEvent(new MeetingServiceEventListener(&onMeetingJoined, &onMeetingEndsQuitApp, &onInMeeting));
 
-	// Set the event listener for host, co-host 
+	// Set the event listener for host, co-host
 	m_pParticipantsController = m_pMeetingService->GetMeetingParticipantsController();
 	m_pParticipantsController->SetEvent(new MeetingParticipantsCtrlEventListener(&onIsHost, &onIsCoHost));
 
@@ -553,7 +557,7 @@ void JoinMeeting()
 	m_pRecordController->SetEvent(new MeetingRecordingCtrlEventListener(&onIsGivenRecordingPermission));
 
 
-	// set event listnener for prompt handler 
+	// set event listnener for prompt handler
 	IMeetingReminderController* meetingremindercontroller = m_pMeetingService->GetMeetingReminderController();
 	MeetingReminderEventListener* meetingremindereventlistener = new MeetingReminderEventListener();
 	meetingremindercontroller->SetEvent(meetingremindereventlistener);
@@ -566,7 +570,7 @@ void JoinMeeting()
 	// withoutloginParam.meetingNumber = 1231231234;
 	withoutloginParam.meetingNumber = std::stoull(meeting_number);
 	withoutloginParam.vanityID = NULL;
-	withoutloginParam.userName = "LinuxChun";
+	withoutloginParam.userName = username.c_str();
 	// withoutloginParam.psw = "1";
 	withoutloginParam.psw = meeting_password.c_str();
 	withoutloginParam.customer_key = NULL;
@@ -642,7 +646,7 @@ void JoinMeeting()
 		{
 			std::cout << "join_meeting:error" << std::endl;
 		}
-	
+
 }
 
 void LeaveMeeting()
@@ -654,7 +658,7 @@ void LeaveMeeting()
 		{
 
 			std::cout << "leave_meeting m_pMeetingService:Null" << std::endl;
-		
+
 		}
 		else
 		{
@@ -667,18 +671,18 @@ void LeaveMeeting()
 		{
 
 			std::cout << "LeaveMeeting() not in meeting " << std::endl;
-			
+
 		}
 
 		if (SDKError::SDKERR_SUCCESS == m_pMeetingService->Leave(ZOOM_SDK_NAMESPACE::LEAVE_MEETING))
 		{
 			std::cout << "LeaveMeeting() success " << std::endl;
-		
+
 		}
 		else
 		{
 			std::cout << "LeaveMeeting() error" << std::endl;
-			
+
 		}
 
 }
@@ -759,7 +763,7 @@ void InitMeetingSDK()
 
 
 
-//used for non headless app 
+//used for non headless app
 
 void StartMeeting()
 {
@@ -811,7 +815,7 @@ void my_handler(int s)
 	printf("Leaving session.\n");
 	CleanSDK();
 
-	
+
 
 	//InitMeetingSDK();
 	//AuthMeetingSDK();
@@ -833,7 +837,7 @@ int main(int argc, char* argv[])
 
 	ReadTEXTSettings();
 
-	
+
 
 	InitMeetingSDK();
 	AuthMeetingSDK();
